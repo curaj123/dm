@@ -1,0 +1,24 @@
+from sklearn.neighbors import KNeighborsClassifier
+
+# Initialize the KNN Classifier
+# You can adjust the number of neighbors (n_neighbors) as needed
+knn_model = KNeighborsClassifier(n_neighbors=5)
+
+# Train the model on the training data
+knn_model.fit(X_train, y_train)
+
+# Predict on test data
+y_pred_knn = knn_model.predict(X_test)
+
+# Evaluate model
+# Calculate accuracy
+accuracy_knn = accuracy_score(y_test, y_pred_knn)
+print(f"KNN Accuracy: {accuracy_knn:.4f}")
+
+# Display classification report
+print("\nKNN Classification Report:")
+print(classification_report(y_test, y_pred_knn))
+
+# Display confusion matrix
+print("\nKNN Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred_knn))

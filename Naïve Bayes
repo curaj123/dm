@@ -1,0 +1,23 @@
+from sklearn.naive_bayes import GaussianNB
+
+# Initialize the Naive Bayes Classifier
+naive_bayes_model = GaussianNB()
+
+# Train the model on the training data
+naive_bayes_model.fit(X_train, y_train)
+
+# Predict on test data
+y_pred_nb = naive_bayes_model.predict(X_test)
+
+# Evaluate model
+# Calculate accuracy
+accuracy_nb = accuracy_score(y_test, y_pred_nb)
+print(f"Naive Bayes Accuracy: {accuracy_nb:.4f}")
+
+# Display classification report
+print("\nNaive Bayes Classification Report:")
+print(classification_report(y_test, y_pred_nb))
+
+# Display confusion matrix
+print("\nNaive Bayes Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred_nb))

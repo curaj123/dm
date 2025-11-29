@@ -1,0 +1,54 @@
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.decomposition import PCA
+import pandas as pd
+import numpy as np
+
+# Ensure X_scaled is available from previous steps (K-Means or Neural Network data preparation)
+if 'X_scaled' not in locals():
+    print("X_scaled not found. Scaling data now...")
+    # Assuming 'data_encoded' is available, re-prepare data if necessary
+    if 'data_encoded' not in locals():
+        data_encoded = pd.get_dummies(data, columns=['Product Category', 'Payment Method', 'Gender'], drop_first=True)
+        data_encoded = data_encoded.drop(['Customer ID', 'Customer Name', 'Purchase Date'], axis=1)
+
+    # Define features (X) for clustering
+    X = data_encoded.drop('Churn', axis=1)
+
+    # Scale the features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+# Sample the data to reduce execution time for Agglomerative Clustering
+sample_fraction = 0.1 # Use 10% of the data for faster processing
+sampled_indices_agg = np.random.choice(X_scaled.shape[0], int(X_scaled.shape[0] * sample_fraction), replace=False)
+X_scaled_sampled_agg = X_scaled[sampled_indices_agg]
+data_with_agg_clusters_sampled = data_encoded.iloc[sampled_indices_agg].copy()
+
+# Agglomerative Clustering parameters
+# n_clusters: The number of clusters to form.
+# linkage: Which linkage criterion to use. ('ward' minimizes variance within clusters)
+agg_model = AgglomerativeClustering(n_clusters=3, linkage='ward')
+
+# Fit the model and predict clusters on the sampled data
+clusters_agg = agg_model.fit_predict(X_scaled_sampled_agg)
+
+# Add cluster labels to the sampled DataFrame for analysis
+data_with_agg_clusters_sampled['Agg_Cluster'] = clusters_agg
+
+print(f"Distribution of customers across Agglomerative clusters (on sampled data):")
+display(data_with_agg_clusters_sampled['Agg_Cluster'].value_counts().sort_index())
+
+# Visualize the clusters
+# Since the data is high-dimensional, we'll use PCA for dimensionality reduction for visualization
+pca_agg = PCA(n_components=2) # Reduce to 2 dimensions for plotting
+X_pca_sampled_agg = pca_agg.fit_transform(X_scaled_sampled_agg)
+
+plt.figure(figsize=(10, 8))
+sns.scatterplot(x=X_pca_sampled_agg[:, 0], y=X_pca_sampled_agg[:, 1], hue=data_with_agg_clusters_sampled['Agg_Cluster'], palette='viridis', legend='full', s=50, alpha=0.7)
+plt.title('Agglomerative Clusters (PCA-reduced Sampled Data)')
+plt.xlabel('PCA Component 1')
+plt.ylabel('PCA Component 2')
+plt.show()

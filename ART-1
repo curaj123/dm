@@ -1,0 +1,143 @@
+import numpy as np
+from sklearn.preprocessing import Binarizer, StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.decomposition import PCA
+import pandas as pd
+
+# ART1 Class Implementation (Simplified for demonstration)
+# Note: This is a basic conceptual implementation. Production-grade ART1 libraries
+# often include more sophisticated features and optimizations.
+class ART1:
+    def __init__(self, n_features, vigilance, n_clusters_max=100):+
+        self.n_features = n_features
+        self.vigilance = vigilance
+        self.n_clusters_max = n_clusters_max
+        self.weights_F1_to_F2 = []  # Bottom-up weights
+        self.weights_F2_to_F1 = []  # Top-down weights (prototypes)
+        self.n_active_clusters = 0
+
+    def _match_function(self, pattern, weight):
+        # Calculate match between pattern and prototype
+        return np.sum(np.minimum(pattern, weight)) / (np.sum(pattern) + 1e-10) # Add epsilon for stability
+
+    def _vigilance_test(self, pattern, prototype):
+        # Check if the match passes the vigilance criterion
+        return np.sum(np.minimum(pattern, prototype)) / (np.sum(pattern) + 1e-10) >= self.vigilance
+
+    def _update_weights(self, pattern, cluster_idx):
+        # Update top-down weights (prototype) by intersection
+        self.weights_F2_to_F1[cluster_idx] = np.minimum(pattern, self.weights_F2_to_F1[cluster_idx])
+        # Update bottom-up weights (simplified for this example)
+        # A more complex ART1 updates bottom-up weights more intricately.
+        self.weights_F1_to_F2[cluster_idx] = self.weights_F2_to_F1[cluster_idx] / (0.5 + np.sum(self.weights_F2_to_F1[cluster_idx]))
+
+    def fit(self, X_binary):
+        self.labels_ = np.full(X_binary.shape[0], -1) # -1 for unclustered, -2 for empty patterns
+
+        for i, pattern in enumerate(X_binary):
+            if np.sum(pattern) == 0: # Handle patterns with all zeros (cannot match)
+                self.labels_[i] = -2
+                continue
+
+            found_match = False
+            # Attempt to find a matching cluster
+            for cluster_idx in range(self.n_active_clusters):
+                # Calculate match score, then perform vigilance test
+                if self._match_function(pattern, self.weights_F2_to_F1[cluster_idx]) > 0 and \
+                   self._vigilance_test(pattern, self.weights_F2_to_F1[cluster_idx]):
+                    # If match is found and passes vigilance, update weights and assign cluster
+                    self._update_weights(pattern, cluster_idx);
+                    self.labels_[i] = cluster_idx
+                    found_match = True
+                    break
+
+            if not found_match:
+                # If no suitable cluster is found or vigilance test fails, create a new cluster
+                if self.n_active_clusters < self.n_clusters_max:
+                    self.weights_F2_to_F1.append(pattern.astype(float)) # New prototype is the pattern itself
+                    # Simplified initial bottom-up weight
+                    self.weights_F1_to_F2.append(pattern.astype(float) / (0.5 + np.sum(pattern)))
+                    self.labels_[i] = self.n_active_clusters
+                    self.n_active_clusters += 1
+                else:
+                    self.labels_[i] = -1 # Max clusters reached, unable to assign
+        return self
+
+    def predict(self, X_binary):
+        predictions = np.full(X_binary.shape[0], -1)
+        for i, pattern in enumerate(X_binary):
+            if np.sum(pattern) == 0:
+                predictions[i] = -2 # Unclusterable
+                continue
+
+            best_match_idx = -1
+            best_match_score = -1.0 # Initialize with a value lower than any possible match score
+
+            for cluster_idx in range(self.n_active_clusters):
+                match_score = self._match_function(pattern, self.weights_F2_to_F1[cluster_idx])
+                # If a better match is found and it passes the vigilance test
+                if match_score > best_match_score and self._vigilance_test(pattern, self.weights_F2_to_F1[cluster_idx]):
+                    best_match_score = match_score
+                    best_match_idx = cluster_idx
+            predictions[i] = best_match_idx
+        return predictions
+
+# End of ART1 Class Implementation
+
+# Re-prepare data for ART1
+# Ensure X_scaled is available from previous steps (K-Means or Neural Network data preparation)
+if 'X_scaled' not in locals():
+    print("X_scaled not found. Scaling data now...")
+    if 'data_encoded' not in locals():
+        data_encoded = pd.get_dummies(data, columns=['Product Category', 'Payment Method', 'Gender'], drop_first=True)
+        data_encoded = data_encoded.drop(['Customer ID', 'Customer Name', 'Purchase Date'], axis=1)
+    X = data_encoded.drop('Churn', axis=1)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+# Binarize the scaled data for ART-1
+# A simple binarization: values above a threshold become 1, otherwise 0.
+# Since data is scaled (mean 0, std 1), 0 is a reasonable threshold to distinguish above/below average.
+binarizer = Binarizer(threshold=0.0)
+X_binary = binarizer.fit_transform(X_scaled)
+
+# Sample the binarized data for faster execution, similar to previous clustering algorithms
+sample_fraction = 0.01 # Use 1% of the data, reduced for faster processing
+sampled_indices_art1 = np.random.choice(X_binary.shape[0], int(X_binary.shape[0] * sample_fraction), replace=False)
+X_binary_sampled = X_binary[sampled_indices_art1]
+data_with_art1_clusters_sampled = data_encoded.iloc[sampled_indices_art1].copy()
+
+print(f"Using {X_binary_sampled.shape[0]} samples for ART-1 training (original: {X_binary.shape[0]}).")
+
+# Initialize and train ART-1 model
+n_features = X_binary_sampled.shape[1]
+vigilance_parameter = 0.7 # Adjust this parameter (0 < vigilance <= 1)
+# Higher vigilance -> more clusters, smaller clusters
+# Lower vigilance -> fewer clusters, larger clusters
+
+print(f"Training ART-1 with vigilance parameter = {vigilance_parameter} on {X_binary_sampled.shape[0]} sampled binary patterns...")
+art1_model = ART1(n_features=n_features, vigilance=vigilance_parameter)
+art1_model.fit(X_binary_sampled)
+art1_clusters = art1_model.labels_
+
+# Add cluster labels to the sampled DataFrame
+data_with_art1_clusters_sampled['ART1_Cluster'] = art1_clusters
+
+print(f"\nDistribution of customers across ART-1 clusters (on sampled data):")
+display(data_with_art1_clusters_sampled['ART1_Cluster'].value_counts().sort_index())
+
+# Visualize the clusters (using PCA for dimensionality reduction for plotting)
+# We use the original scaled data for PCA to preserve more variance for visualization,
+# even though ART-1 itself used the binarized data.
+pca_art1 = PCA(n_components=2) # Reduce to 2 dimensions for plotting
+X_pca_sampled_art1 = pca_art1.fit_transform(X_scaled[sampled_indices_art1])
+
+plt.figure(figsize=(10, 8))
+sns.scatterplot(x=X_pca_sampled_art1[:, 0], y=X_pca_sampled_art1[:, 1],
+                hue=data_with_art1_clusters_sampled['ART1_Cluster'],
+                palette='viridis', legend='full', s=50, alpha=0.7)
+plt.title('ART-1 Clusters (PCA-reduced Sampled Data)')
+plt.xlabel('PCA Component 1')
+plt.ylabel('PCA Component 2')
+plt.show()

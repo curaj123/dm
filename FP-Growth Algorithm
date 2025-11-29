@@ -1,0 +1,15 @@
+from mlxtend.frequent_patterns import fpgrowth, association_rules
+
+# Apply the FP-Growth algorithm to find frequent itemsets
+# You can adjust the min_support based on your needs
+frequent_itemsets_fpgrowth = fpgrowth(apriori_df, min_support=0.2, use_colnames=True)
+
+# Generate association rules
+rules_fpgrowth = association_rules(frequent_itemsets_fpgrowth, metric="lift", min_threshold=1)
+
+# Display the frequent itemsets and rules
+print("Frequent Itemsets (FP-Growth):")
+display(frequent_itemsets_fpgrowth)
+
+print("\nAssociation Rules (FP-Growth):")
+display(rules_fpgrowth)

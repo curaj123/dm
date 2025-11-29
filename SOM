@@ -1,0 +1,74 @@
+# Install minisom if not already installed
+!pip install minisom
+
+from minisom import MiniSom
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.cluster import KMeans
+
+# Re-sampling the data for consistent execution time, or using existing X_sampled
+# Ensure X_scaled is available from previous steps
+if 'X_scaled' not in locals():
+    raise ValueError("X_scaled DataFrame is not available. Please ensure previous steps ran successfully.")
+
+sample_fraction = 0.1 # Use 10% of the data for faster processing
+sampled_indices = np.random.choice(X_scaled.shape[0], int(X_scaled.shape[0] * sample_fraction), replace=False)
+X_sampled = X_scaled[sampled_indices]
+data_with_som_clusters_sampled = data_encoded.iloc[sampled_indices].copy()
+
+
+# SOM parameters
+som_rows = 10 # Height of the SOM grid
+som_columns = 10 # Width of the SOM grid
+input_len = X_sampled.shape[1] # Number of features in the input data
+
+# Initialize and train the SOM
+# sigma: radius of the neighborhood function
+# learning_rate: initial learning rate
+# num_iteration: number of iterations for training (reduced for speed)
+print(f"Training SOM with {som_rows*som_columns} neurons on {X_sampled.shape[0]} samples...")
+som = MiniSom(som_rows, som_columns, input_len,
+              sigma=1.0, learning_rate=0.5, neighborhood_function='gaussian',
+              random_seed=42)
+
+som.random_weights_init(X_sampled)
+som.train_random(X_sampled, num_iteration=500, verbose=True) # Reduced iterations for speed
+
+print("SOM training complete.")
+
+# Map each data point to its Best Matching Unit (BMU) on the SOM grid
+bmu_map = np.array([som.winner(x) for x in X_sampled])
+
+# To get explicit clusters, we cluster the SOM's weight vectors (neurons) using K-Means
+n_som_clusters = 3 # You can adjust the number of final clusters as needed
+som_weights = som.get_weights().reshape(-1, input_len) # Flatten map weights for K-Means
+kmeans_on_som = KMeans(n_clusters=n_som_clusters, random_state=42, n_init=10)
+som_neuron_clusters = kmeans_on_som.fit_predict(som_weights)
+
+# Assign original (sampled) data points to these clusters based on their BMUs
+# The BMU coordinates (row, col) are converted to a single index to match som_neuron_clusters
+bmu_indices = bmu_map[:, 0] * som_columns + bmu_map[:, 1]
+som_clusters = som_neuron_clusters[bmu_indices]
+
+# Add cluster labels to the sampled DataFrame
+data_with_som_clusters_sampled['SOM_Cluster'] = som_clusters
+
+print(f"\nDistribution of customers across {n_som_clusters} SOM-based clusters (on sampled data):")
+display(data_with_som_clusters_sampled['SOM_Cluster'].value_counts().sort_index())
+
+# Visualize the distribution of sampled data points across the derived SOM clusters
+plt.figure(figsize=(8, 6))
+sns.countplot(x='SOM_Cluster', data=data_with_som_clusters_sampled, palette='viridis')
+plt.title('Customer Count Per SOM-based Cluster (Sampled Data)')
+plt.xlabel('SOM Cluster')
+plt.ylabel('Number of Customers')
+plt.show()
+
+# Optional: Visualize the U-matrix (Unified Distance Matrix) of the SOM
+# The U-matrix shows distances between neighboring neurons; darker areas indicate cluster boundaries
+plt.figure(figsize=(som_columns, som_rows))
+plt.pcolor(som.distance_map().T, cmap='bone_r') # Transposed for typical visualization
+plt.colorbar()
+plt.title('SOM U-matrix (Unified Distance Matrix)')
+plt.show()

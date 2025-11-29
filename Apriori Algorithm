@@ -1,0 +1,21 @@
+from mlxtend.frequent_patterns import apriori, association_rules
+
+# Group by Customer ID and list the product categories
+customer_product_list = data.groupby('Customer ID')['Product Category'].apply(list).reset_index()
+
+# Create a one-hot encoded DataFrame for Apriori
+apriori_df = customer_product_list['Product Category'].str.join('|').str.get_dummies(sep='|').astype(bool)
+
+# Apply the Apriori algorithm to find frequent itemsets
+# You can adjust the min_support based on your needs
+frequent_itemsets = apriori(apriori_df, min_support=0.2, use_colnames=True)
+
+# Generate association rules
+rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
+
+# Display the frequent itemsets and rules
+print("Frequent Itemsets:")
+display(frequent_itemsets)
+
+print("\nAssociation Rules:")
+display(rules)

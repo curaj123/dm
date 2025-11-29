@@ -1,0 +1,116 @@
+import numpy as np
+
+class NeuralNetwork:
+    def __init__(self, input_size, hidden_size, output_size):
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+
+        # Initialize weights and biases
+        self.weights_input_hidden = np.random.randn(self.input_size, self.hidden_size) * 0.01
+        self.bias_hidden = np.zeros((1, self.hidden_size))
+        self.weights_hidden_output = np.random.randn(self.hidden_size, self.output_size) * 0.01
+        self.bias_output = np.zeros((1, self.output_size))
+
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+
+    def sigmoid_derivative(self, x):
+        return x * (1 - x)
+
+    def forward(self, X):
+        # Input to Hidden Layer
+        self.hidden_input = np.dot(X, self.weights_input_hidden) + self.bias_hidden
+        self.hidden_output = self.sigmoid(self.hidden_input)
+
+        # Hidden to Output Layer
+        self.output_input = np.dot(self.hidden_output, self.weights_hidden_output) + self.bias_output
+        self.output = self.sigmoid(self.output_input)
+        return self.output
+
+    def backward(self, X, y, output, learning_rate):
+        # Calculate output layer error and delta
+        output_error = y - output
+        output_delta = output_error * self.sigmoid_derivative(output)
+
+        # Calculate hidden layer error and delta
+        hidden_error = np.dot(output_delta, self.weights_hidden_output.T)
+        hidden_delta = hidden_error * self.sigmoid_derivative(self.hidden_output)
+
+        # Update weights and biases
+        self.weights_hidden_output += np.dot(self.hidden_output.T, output_delta) * learning_rate
+        self.bias_output += np.sum(output_delta, axis=0, keepdims=True) * learning_rate
+        self.weights_input_hidden += np.dot(X.T, hidden_delta) * learning_rate
+        self.bias_hidden += np.sum(hidden_delta, axis=0, keepdims=True) * learning_rate
+
+    def train(self, X, y, epochs, learning_rate):
+        for epoch in range(epochs):
+            output = self.forward(X)
+            self.backward(X, y, output, learning_rate)
+            if (epoch + 1) % 1000 == 0:
+                loss = np.mean(np.square(y - output))
+                print(f"Epoch {epoch + 1}, Loss: {loss:.4f}")
+
+
+
+
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import pandas as pd
+
+# Assuming 'data_encoded' from the Decision Tree section is available
+# If not, you might need to re-run the encoding step.
+if 'data_encoded' not in locals():
+    print("data_encoded not found. Please ensure the data encoding step (Decision Tree section) is run.")
+    # As a fallback, re-encode data if it's not present
+    data_encoded = pd.get_dummies(data, columns=['Product Category', 'Payment Method', 'Gender'], drop_first=True)
+    data_encoded = data_encoded.drop(['Customer ID', 'Customer Name', 'Purchase Date'], axis=1)
+
+# Define features (X_nn) and target (y_nn) for the neural network
+X_nn = data_encoded[['Product Price', 'Quantity', 'Total Purchase Amount', 'Customer Age', 'Returns']]
+y_nn = data_encoded['Churn'].values.reshape(-1, 1) # Reshape for neural network input
+
+# Scale the features
+scaler_nn = StandardScaler()
+X_nn_scaled = scaler_nn.fit_transform(X_nn)
+
+# Split data into training and testing sets
+X_train_nn, X_test_nn, y_train_nn, y_test_nn = train_test_split(X_nn_scaled, y_nn, test_size=0.2, random_state=42)
+
+print("Data prepared for Neural Network:")
+print(f"X_train_nn shape: {X_train_nn.shape}")
+print(f"y_train_nn shape: {y_train_nn.shape}")
+
+
+
+
+
+
+# Initialize the Neural Network
+input_size_nn = X_train_nn.shape[1]
+hidden_size_nn = 10 # You can adjust this
+output_size_nn = 1
+
+neural_net = NeuralNetwork(input_size_nn, hidden_size_nn, output_size_nn)
+
+# Train the neural network
+epochs = 100 # Number of training iterations (reduced for much faster execution)
+learning_rate = 0.1 # Learning rate
+
+print("\nStarting Neural Network training...")
+neural_net.train(X_train_nn, y_train_nn, epochs, learning_rate)
+
+# Make predictions on the test set
+y_pred_nn = (neural_net.forward(X_test_nn) > 0.5).astype(int)
+
+# Evaluate the model
+accuracy_nn = accuracy_score(y_test_nn, y_pred_nn)
+print(f"\nNeural Network Accuracy: {accuracy_nn:.4f}")
+
+print("\nNeural Network Classification Report:")
+print(classification_report(y_test_nn, y_pred_nn))
+
+print("\nNeural Network Confusion Matrix:")
+print(confusion_matrix(y_test_nn, y_pred_nn))

@@ -1,0 +1,39 @@
+import kagglehub
+import os
+# Download latest version
+path = kagglehub.dataset_download("shriyashjagtap/e-commerce-customer-for-behavior-analysis")
+
+print("Path to dataset files:", path)
+path=os.path.join(path,os.listdir(path)[0])
+print(path)
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+  
+import pandas as pd
+data=pd.read_csv(path)
+data.head(9)
+data.info()
+data.describe()
+data.shape
+data.isna().sum()
+data["Returns"]=data["Returns"].fillna(0)
+data.isna().sum()
+data.head()
+number_column=[]
+object_column=[]
+for column in data.columns:
+  if(data[column].dtype=="object"):
+    object_column.append(column)
+  else:
+    number_column.append(column)
+print(number_column)
+print(object_column)
+
+df=data.copy()
+
+
+
+
+
+  
